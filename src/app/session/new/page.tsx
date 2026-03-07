@@ -6,8 +6,8 @@ import { WritingEditor } from '@/components/editor/WritingEditor';
 import { MoodSlider } from '@/components/session/MoodSlider';
 import { SessionResults } from '@/components/session/SessionResults';
 import { createClient } from '@/lib/supabase/client';
-import { getRandomPrompt } from '@/lib/prompts';
-import type { Prompt } from '@/lib/prompts';
+import { getRandomPrompt, getDepthFromSessionCount, DEPTH_LABELS } from '@/lib/prompts';
+import type { Prompt, PromptDepth } from '@/lib/prompts';
 import type { LatencyEntry, Insights } from '@/lib/types';
 
 type Step = 'loading' | 'pre_session' | 'mood_before' | 'writing' | 'analyzing' | 'results';
@@ -36,8 +36,9 @@ export default function NewSessionPage() {
   const [lastSession, setLastSession] = useState<LastSession | null>(null);
   const [followUpAnswer, setFollowUpAnswer] = useState<FollowUp | null>(null);
 
+  const [sessionCount, setSessionCount] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<Prompt['category']>('general');
-  const [prompt, setPrompt] = useState<Prompt>(() => getRandomPrompt('general'));
+  const [prompt, setPrompt] = useState<Prompt>(() => getRandomPrompt('general', 'superficie'));
   const [moodBefore, setMoodBefore] = useState(5);
   const [moodAfter, setMoodAfter] = useState(5);
   const [insights, setInsights] = useState<Insights | null>(null);
@@ -53,13 +54,23 @@ export default function NewSessionPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
 
-      const { data } = await supabase
-        .from('sessions')
-        .select('id, micro_action_followup, insights(micro_action, top_words)')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const [{ data }, { count }] = await Promise.all([
+        supabase
+          .from('sessions')
+          .select('id, micro_action_followup, insights(micro_action, top_words)')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('sessions')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id),
+      ]);
+
+      const total = count ?? 0;
+      setSessionCount(total);
+      setPrompt(getRandomPrompt('general', getDepthFromSessionCount(total)));
 
       if (data) {
         // Supabase puede devolver insights como array o como objeto según la relación
@@ -99,12 +110,14 @@ export default function NewSessionPage() {
     setStep('mood_before');
   };
 
+  const depth: PromptDepth = getDepthFromSessionCount(sessionCount);
+
   const handleCategoryChange = (cat: Prompt['category']) => {
     setSelectedCategory(cat);
-    setPrompt(getRandomPrompt(cat));
+    setPrompt(getRandomPrompt(cat, depth));
   };
 
-  const handleNewPrompt = () => setPrompt(getRandomPrompt(selectedCategory));
+  const handleNewPrompt = () => setPrompt(getRandomPrompt(selectedCategory, depth));
 
   const handleStartWriting = () => {
     setStartTime(Date.now());
@@ -375,12 +388,23 @@ export default function NewSessionPage() {
               style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
             >
               <div className="flex items-center justify-between">
-                <p
-                  className="text-xs font-medium tracking-widest uppercase"
-                  style={{ color: 'var(--text-subtle)' }}
-                >
-                  Tu pregunta de hoy
-                </p>
+                <div className="flex items-center gap-2">
+                  <p
+                    className="text-xs font-medium tracking-widest uppercase"
+                    style={{ color: 'var(--text-subtle)' }}
+                  >
+                    Tu pregunta de hoy
+                  </p>
+                  <span
+                    className="text-xs px-2 py-0.5 rounded-full"
+                    style={{
+                      background: 'rgba(193,125,40,0.10)',
+                      color: 'var(--amber-dim)',
+                    }}
+                  >
+                    {DEPTH_LABELS[depth]}
+                  </span>
+                </div>
                 <button
                   onClick={handleNewPrompt}
                   className="text-xs transition-all"
