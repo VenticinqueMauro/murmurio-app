@@ -136,7 +136,6 @@ export default async function DashboardPage() {
         {/* Nav secundaria */}
         <nav className="flex gap-1 flex-wrap">
           {[
-            { href: '/session/new', label: 'Nueva sesión' },
             { href: '/session/rewrite', label: 'Reescritura' },
             { href: '/session/goals', label: 'Metas' },
             { href: '/session/aversion', label: 'Aversión' },
@@ -144,12 +143,7 @@ export default async function DashboardPage() {
             <Link
               key={href}
               href={href}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-              style={{
-                background: 'var(--surface)',
-                color: 'var(--text-muted)',
-                border: '1px solid var(--border)',
-              }}
+              className="nav-pill px-3 py-1.5 rounded-lg text-xs font-medium"
             >
               {label}
             </Link>
