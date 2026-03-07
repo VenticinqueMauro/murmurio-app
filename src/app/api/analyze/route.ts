@@ -55,12 +55,14 @@ export async function POST(request: NextRequest) {
   let text: string;
   let latency_data: LatencyEntry[];
   let user_vocabulary: string[] = [];
+  let active_goal: string | null = null;
 
   try {
     const body = await request.json();
     text = body.text;
     latency_data = body.latency_data ?? [];
     user_vocabulary = body.user_vocabulary ?? [];
+    active_goal = body.active_goal ?? null;
   } catch {
     return NextResponse.json({ error: 'Cuerpo de solicitud inválido' }, { status: 400 });
   }
@@ -80,7 +82,12 @@ export async function POST(request: NextRequest) {
       ? `\n\nVOCABULARIO RECURRENTE DE ESTE USUARIO (palabras que han aparecido en sesiones anteriores): ${user_vocabulary.join(', ')}.\nSi alguna de estas palabras reaparece hoy, señálalo en las preguntas espejo — su reaparición es significativa.`
       : '';
 
-  const systemPrompt = BASE_SYSTEM_PROMPT + vocabularySection;
+  const goalSection =
+    active_goal
+      ? `\n\nOBJETIVO ACTIVO DEL USUARIO (descripción sensorial que el usuario escribió sobre su meta): "${active_goal}".\nSi algo en el texto de hoy conecta con esta sensación o la contradice, podés mencionarlo sutilmente en UNA de las preguntas espejo — sin forzarlo ni nombrarlo directamente.`
+      : '';
+
+  const systemPrompt = BASE_SYSTEM_PROMPT + vocabularySection + goalSection;
 
   const userMessage = `TEXTO DEL USUARIO:\n${text}\n\nPALABRAS CON HESITACIÓN (el subconsciente dudó aquí):\n${hesitations || 'Ninguna detectada'}`;
 

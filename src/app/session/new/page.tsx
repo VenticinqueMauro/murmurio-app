@@ -38,6 +38,7 @@ export default function NewSessionPage() {
 
   const [sessionCount, setSessionCount] = useState(0);
   const [vocabulary, setVocabulary] = useState<string[]>([]);
+  const [activeGoal, setActiveGoal] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Prompt['category']>('general');
   const [prompt, setPrompt] = useState<Prompt>(() => getRandomPrompt('general', 'superficie'));
   const [moodBefore, setMoodBefore] = useState(5);
@@ -55,7 +56,7 @@ export default function NewSessionPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
 
-      const [{ data }, { count }, { data: insightsData }] = await Promise.all([
+      const [{ data }, { count }, { data: insightsData }, { data: goalData }] = await Promise.all([
         supabase
           .from('sessions')
           .select('id, micro_action_followup, insights(micro_action, top_words)')
@@ -72,6 +73,13 @@ export default function NewSessionPage() {
           .select('top_words')
           .eq('user_id', user.id)
           .limit(30),
+        supabase
+          .from('goals')
+          .select('sensory_description')
+          .eq('user_id', user.id)
+          .eq('active', true)
+          .limit(1)
+          .maybeSingle(),
       ]);
 
       const total = count ?? 0;
@@ -90,6 +98,10 @@ export default function NewSessionPage() {
         .slice(0, 10)
         .map(([w]) => w);
       setVocabulary(vocab);
+
+      if (goalData?.sensory_description) {
+        setActiveGoal(goalData.sensory_description);
+      }
 
       if (data) {
         // Supabase puede devolver insights como array o como objeto según la relación
@@ -189,7 +201,12 @@ export default function NewSessionPage() {
         const response = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, latency_data: latencyData, user_vocabulary: vocabulary }),
+          body: JSON.stringify({
+          text,
+          latency_data: latencyData,
+          user_vocabulary: vocabulary,
+          active_goal: activeGoal,
+        }),
         });
 
         if (!response.ok) throw new Error('El análisis falló');
@@ -216,7 +233,7 @@ export default function NewSessionPage() {
         setStep('writing');
       }
     },
-    [startTime, moodBefore, prompt, router, vocabulary]
+    [startTime, moodBefore, prompt, router, vocabulary, activeGoal]
   );
 
   const handleSaveSession = async () => {

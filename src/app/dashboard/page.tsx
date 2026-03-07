@@ -207,12 +207,27 @@ export default async function DashboardPage() {
               className="flex items-start gap-4 p-4 rounded-lg transition-all"
               style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
             >
-              <div className="space-y-1">
+              <div className="space-y-1 flex-1">
                 <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
                   Reescritura de Recuerdos
                 </p>
                 <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                   Tres versiones del mismo evento. Lo que eras, lo que alguien te ve, lo que querés ser.
+                </p>
+              </div>
+              <span className="text-lg shrink-0" style={{ color: 'var(--amber)' }}>→</span>
+            </Link>
+            <Link
+              href="/session/goals"
+              className="flex items-start gap-4 p-4 rounded-lg transition-all"
+              style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+            >
+              <div className="space-y-1 flex-1">
+                <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                  Visualización de Metas
+                </p>
+                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  Describí cómo te sentís cuando ya lo lograste. Agamenón construye el camino.
                 </p>
               </div>
               <span className="text-lg shrink-0" style={{ color: 'var(--amber)' }}>→</span>
