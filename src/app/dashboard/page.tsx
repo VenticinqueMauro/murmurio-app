@@ -232,6 +232,21 @@ export default async function DashboardPage() {
               </div>
               <span className="text-lg shrink-0" style={{ color: 'var(--amber)' }}>→</span>
             </Link>
+            <Link
+              href="/session/aversion"
+              className="flex items-start gap-4 p-4 rounded-lg transition-all"
+              style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+            >
+              <div className="space-y-1 flex-1">
+                <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                  Técnica de Aversión Guiada
+                </p>
+                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  Amplificá todo lo negativo de un hábito que querés eliminar. Sin supresión.
+                </p>
+              </div>
+              <span className="text-lg shrink-0" style={{ color: 'var(--amber)' }}>→</span>
+            </Link>
           </div>
         )}
 
