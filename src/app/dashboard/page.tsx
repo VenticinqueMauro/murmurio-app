@@ -133,6 +133,29 @@ export default async function DashboardPage() {
           </div>
         </div>
 
+        {/* Nav secundaria */}
+        <nav className="flex gap-1 flex-wrap">
+          {[
+            { href: '/session/new', label: 'Nueva sesión' },
+            { href: '/session/rewrite', label: 'Reescritura' },
+            { href: '/session/goals', label: 'Metas' },
+            { href: '/session/aversion', label: 'Aversión' },
+          ].map(({ href, label }) => (
+            <Link
+              key={href}
+              href={href}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+              style={{
+                background: 'var(--surface)',
+                color: 'var(--text-muted)',
+                border: '1px solid var(--border)',
+              }}
+            >
+              {label}
+            </Link>
+          ))}
+        </nav>
+
         {/* El Puente de 21 días */}
         <PuenteDeLosDias
           streakCount={streakCount}
@@ -193,62 +216,6 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        {/* Módulos de Transformación */}
-        {(totalSessions ?? 0) >= 1 && (
-          <div className="space-y-3">
-            <p
-              className="text-xs font-medium tracking-widest uppercase"
-              style={{ color: 'var(--text-subtle)' }}
-            >
-              Módulos de Transformación
-            </p>
-            <Link
-              href="/session/rewrite"
-              className="flex items-start gap-4 p-4 rounded-lg transition-all"
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
-            >
-              <div className="space-y-1 flex-1">
-                <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
-                  Reescritura de Recuerdos
-                </p>
-                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                  Tres versiones del mismo evento. Lo que eras, lo que alguien te ve, lo que querés ser.
-                </p>
-              </div>
-              <span className="text-lg shrink-0" style={{ color: 'var(--amber)' }}>→</span>
-            </Link>
-            <Link
-              href="/session/goals"
-              className="flex items-start gap-4 p-4 rounded-lg transition-all"
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
-            >
-              <div className="space-y-1 flex-1">
-                <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
-                  Visualización de Metas
-                </p>
-                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                  Describí cómo te sentís cuando ya lo lograste. Agamenón construye el camino.
-                </p>
-              </div>
-              <span className="text-lg shrink-0" style={{ color: 'var(--amber)' }}>→</span>
-            </Link>
-            <Link
-              href="/session/aversion"
-              className="flex items-start gap-4 p-4 rounded-lg transition-all"
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
-            >
-              <div className="space-y-1 flex-1">
-                <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
-                  Técnica de Aversión Guiada
-                </p>
-                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                  Amplificá todo lo negativo de un hábito que querés eliminar. Sin supresión.
-                </p>
-              </div>
-              <span className="text-lg shrink-0" style={{ color: 'var(--amber)' }}>→</span>
-            </Link>
-          </div>
-        )}
 
         {/* Lista de sesiones */}
         {typedSessions.length === 0 ? (
