@@ -7,6 +7,7 @@ import { LogoutButton } from '@/components/ui/LogoutButton';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { PuenteDeLosDias } from '@/components/session/PuenteDeLosDias';
 import { CartaSemanal } from '@/components/session/CartaSemanal';
+import { VocabularioPersonal } from '@/components/session/VocabularioPersonal';
 import type { Session, Insights } from '@/lib/types';
 
 function getWeekStart(): string {
@@ -43,6 +44,7 @@ export default async function DashboardPage() {
     { count: totalSessions },
     { data: weeklyLetter },
     { count: sessionCountThisWeek },
+    { data: allInsights },
   ] = await Promise.all([
     supabase
       .from('sessions')
@@ -70,7 +72,24 @@ export default async function DashboardPage() {
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .gte('created_at', weekStart),
+    supabase
+      .from('insights')
+      .select('top_words')
+      .eq('user_id', user.id)
+      .limit(60),
   ]);
+
+  // Frecuencia histórica de palabras
+  const wordFreq: Record<string, number> = {};
+  for (const row of allInsights ?? []) {
+    for (const w of (row.top_words as string[]) ?? []) {
+      wordFreq[w] = (wordFreq[w] ?? 0) + 1;
+    }
+  }
+  const vocabulary = Object.entries(wordFreq)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([word, count]) => ({ word, count }));
 
   const typedSessions = (sessions ?? []) as SessionWithInsight[];
 
@@ -120,6 +139,9 @@ export default async function DashboardPage() {
           totalSessions={totalSessions ?? 0}
           hasSessionToday={hasSessionToday}
         />
+
+        {/* Vocabulario Personal */}
+        <VocabularioPersonal vocabulary={vocabulary} />
 
         {/* Carta Semanal de Agamenón */}
         <CartaSemanal

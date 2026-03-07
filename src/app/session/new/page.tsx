@@ -37,6 +37,7 @@ export default function NewSessionPage() {
   const [followUpAnswer, setFollowUpAnswer] = useState<FollowUp | null>(null);
 
   const [sessionCount, setSessionCount] = useState(0);
+  const [vocabulary, setVocabulary] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Prompt['category']>('general');
   const [prompt, setPrompt] = useState<Prompt>(() => getRandomPrompt('general', 'superficie'));
   const [moodBefore, setMoodBefore] = useState(5);
@@ -54,7 +55,7 @@ export default function NewSessionPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
 
-      const [{ data }, { count }] = await Promise.all([
+      const [{ data }, { count }, { data: insightsData }] = await Promise.all([
         supabase
           .from('sessions')
           .select('id, micro_action_followup, insights(micro_action, top_words)')
@@ -66,11 +67,29 @@ export default function NewSessionPage() {
           .from('sessions')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id),
+        supabase
+          .from('insights')
+          .select('top_words')
+          .eq('user_id', user.id)
+          .limit(30),
       ]);
 
       const total = count ?? 0;
       setSessionCount(total);
       setPrompt(getRandomPrompt('general', getDepthFromSessionCount(total)));
+
+      // Construir vocabulario histórico (top 10 palabras más frecuentes)
+      const wordFreq: Record<string, number> = {};
+      for (const row of insightsData ?? []) {
+        for (const w of (row.top_words as string[]) ?? []) {
+          wordFreq[w] = (wordFreq[w] ?? 0) + 1;
+        }
+      }
+      const vocab = Object.entries(wordFreq)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([w]) => w);
+      setVocabulary(vocab);
 
       if (data) {
         // Supabase puede devolver insights como array o como objeto según la relación
@@ -170,7 +189,7 @@ export default function NewSessionPage() {
         const response = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, latency_data: latencyData }),
+          body: JSON.stringify({ text, latency_data: latencyData, user_vocabulary: vocabulary }),
         });
 
         if (!response.ok) throw new Error('El análisis falló');
@@ -197,7 +216,7 @@ export default function NewSessionPage() {
         setStep('writing');
       }
     },
-    [startTime, moodBefore, prompt, router]
+    [startTime, moodBefore, prompt, router, vocabulary]
   );
 
   const handleSaveSession = async () => {

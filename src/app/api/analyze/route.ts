@@ -7,7 +7,7 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-const SYSTEM_PROMPT = `Eres el núcleo de IA de Murmurio — un espejo perceptivo entre la mente consciente (Tito) y el subconsciente (Agamenón).
+const BASE_SYSTEM_PROMPT = `Eres el núcleo de IA de Murmurio — un espejo perceptivo entre la mente consciente (Tito) y el subconsciente (Agamenón).
 
 Tu rol NO es dar consejos ni diagnósticos. Eres un detector de lo que la mente consciente intenta ocultar.
 
@@ -54,11 +54,13 @@ export async function POST(request: NextRequest) {
 
   let text: string;
   let latency_data: LatencyEntry[];
+  let user_vocabulary: string[] = [];
 
   try {
     const body = await request.json();
     text = body.text;
     latency_data = body.latency_data ?? [];
+    user_vocabulary = body.user_vocabulary ?? [];
   } catch {
     return NextResponse.json({ error: 'Cuerpo de solicitud inválido' }, { status: 400 });
   }
@@ -73,13 +75,20 @@ export async function POST(request: NextRequest) {
     .map((d) => `"${d.word}" (${d.latency_ms}ms)`)
     .join(', ');
 
+  const vocabularySection =
+    user_vocabulary.length > 0
+      ? `\n\nVOCABULARIO RECURRENTE DE ESTE USUARIO (palabras que han aparecido en sesiones anteriores): ${user_vocabulary.join(', ')}.\nSi alguna de estas palabras reaparece hoy, señálalo en las preguntas espejo — su reaparición es significativa.`
+      : '';
+
+  const systemPrompt = BASE_SYSTEM_PROMPT + vocabularySection;
+
   const userMessage = `TEXTO DEL USUARIO:\n${text}\n\nPALABRAS CON HESITACIÓN (el subconsciente dudó aquí):\n${hesitations || 'Ninguna detectada'}`;
 
   try {
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     });
 
