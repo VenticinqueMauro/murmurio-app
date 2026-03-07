@@ -1,11 +1,11 @@
 'use client';
 
 import { useRef, useState, useCallback, useEffect } from 'react';
-import type { LatencyEntry } from '@/lib/types';
+import type { LatencyEntry, DeletionEntry } from '@/lib/types';
 
 interface WritingEditorProps {
   prompt: string;
-  onComplete: (text: string, latencyData: LatencyEntry[]) => void;
+  onComplete: (text: string, latencyData: LatencyEntry[], deletions: DeletionEntry[]) => void;
 }
 
 const INACTIVITY_MS = 3000;
@@ -13,6 +13,19 @@ const MAX_BLUR_PX = 10;
 const BLUR_STEP = 0.6;
 const BLUR_INTERVAL_MS = 250;
 const MIN_WORDS = 50;
+
+// Una deleción es "significativa" (probable autocensura) si:
+// - la pausa antes de borrar fue > 1s (el usuario pensó antes de borrar), O
+// - se borró más de 5 caracteres de golpe (más que un error tipográfico)
+const DELETION_PAUSE_MS = 1000;
+const DELETION_LENGTH_THRESHOLD = 5;
+
+function getDeletedContent(before: string, after: string): string {
+  if (after.length >= before.length) return '';
+  let i = 0;
+  while (i < after.length && before[i] === after[i]) i++;
+  return before.slice(i, i + (before.length - after.length));
+}
 
 export function WritingEditor({ prompt, onComplete }: WritingEditorProps) {
   const [text, setText] = useState('');
@@ -32,7 +45,12 @@ export function WritingEditor({ prompt, onComplete }: WritingEditorProps) {
   const blurIntervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const elapsedIntervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
-  // Limpia timers al desmontar
+  // Deletion tracking
+  const deletionEntriesRef = useRef<DeletionEntry[]>([]);
+  const isDeletingRef = useRef<boolean>(false);
+  const deletionPauseRef = useRef<number>(0);
+  const deletionAccumulatedRef = useRef<string>('');
+
   useEffect(() => {
     return () => {
       clearTimeout(inactivityTimerRef.current);
@@ -78,27 +96,61 @@ export function WritingEditor({ prompt, onComplete }: WritingEditorProps) {
     wordPositionRef.current++;
   }, []);
 
+  const finalizeDeletion = useCallback(() => {
+    const deleted = deletionAccumulatedRef.current;
+    const pause = deletionPauseRef.current;
+    const isMeaningful =
+      deleted.trim().length > 0 &&
+      (pause > DELETION_PAUSE_MS || deleted.length > DELETION_LENGTH_THRESHOLD);
+
+    if (isMeaningful) {
+      deletionEntriesRef.current.push({
+        deleted_text: deleted.trim(),
+        pause_before_ms: pause,
+      });
+    }
+
+    deletionAccumulatedRef.current = '';
+    isDeletingRef.current = false;
+    wordBufferRef.current = ''; // reset word buffer — contexto cambió
+  }, []);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      // Bloquear borrado y edición
+      // Bloquear: undo, cut, select-all (difíciles de rastrear y rompen el flujo)
       if (
-        e.key === 'Backspace' ||
-        e.key === 'Delete' ||
-        ((e.ctrlKey || e.metaKey) &&
-          ['z', 'Z', 'a', 'A', 'x', 'X'].includes(e.key))
+        (e.ctrlKey || e.metaKey) &&
+        ['z', 'Z', 'x', 'X', 'a', 'A'].includes(e.key)
       ) {
         e.preventDefault();
         return;
       }
 
-      // Solo procesar teclas que generan texto
+      const isBackspace = e.key === 'Backspace';
+      const isDelete = e.key === 'Delete';
       const isPrintable = e.key.length === 1;
       const isEnter = e.key === 'Enter';
-      if (!isPrintable && !isEnter) return;
 
       const now = Date.now();
 
-      // Primera tecla — arrancar timer de elapsed
+      if (isBackspace || isDelete) {
+        if (!isDeletingRef.current) {
+          isDeletingRef.current = true;
+          deletionPauseRef.current = hasStarted ? now - lastKeystrokeRef.current : 0;
+        }
+        lastKeystrokeRef.current = now;
+        resetInactivity();
+        return; // permitir el borrado
+      }
+
+      // Cualquier tecla que no sea borrar cierra el run de deleción
+      if (isDeletingRef.current) {
+        finalizeDeletion();
+      }
+
+      if (!isPrintable && !isEnter) return;
+
+      // Primera tecla
       if (!hasStarted) {
         setHasStarted(true);
         elapsedIntervalRef.current = setInterval(() => {
@@ -126,25 +178,20 @@ export function WritingEditor({ prompt, onComplete }: WritingEditorProps) {
       lastKeystrokeRef.current = now;
       resetInactivity();
     },
-    [hasStarted, resetInactivity, recordWord]
+    [hasStarted, resetInactivity, recordWord, finalizeDeletion]
   );
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const newVal = e.target.value;
-      // Defensa extra: si el texto se acortó (paste, etc.) ignorar
-      if (newVal.length < text.length) {
-        if (textareaRef.current) textareaRef.current.value = text;
-        return;
+
+      // Acumular lo que se borró durante un run de deleción
+      if (newVal.length < text.length && isDeletingRef.current) {
+        const deleted = getDeletedContent(text, newVal);
+        deletionAccumulatedRef.current += deleted;
       }
+
       setText(newVal);
-      // Mantener cursor al final
-      requestAnimationFrame(() => {
-        if (textareaRef.current) {
-          textareaRef.current.selectionStart = newVal.length;
-          textareaRef.current.selectionEnd = newVal.length;
-        }
-      });
     },
     [text]
   );
@@ -155,16 +202,18 @@ export function WritingEditor({ prompt, onComplete }: WritingEditorProps) {
 
   const handleSubmit = useCallback(() => {
     if (isSubmitting) return;
-    // Guardar última palabra si queda en el buffer
     if (wordBufferRef.current.trim()) {
       recordWord(wordBufferRef.current, Date.now());
+    }
+    if (isDeletingRef.current) {
+      finalizeDeletion();
     }
     clearInterval(elapsedIntervalRef.current);
     clearTimeout(inactivityTimerRef.current);
     clearInterval(blurIntervalRef.current);
     setIsSubmitting(true);
-    onComplete(text, latencyDataRef.current);
-  }, [isSubmitting, text, onComplete, recordWord]);
+    onComplete(text, latencyDataRef.current, deletionEntriesRef.current);
+  }, [isSubmitting, text, onComplete, recordWord, finalizeDeletion]);
 
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
   const canSubmit = wordCount >= MIN_WORDS && !isSubmitting;
@@ -193,7 +242,7 @@ export function WritingEditor({ prompt, onComplete }: WritingEditorProps) {
       {/* Instrucción inicial */}
       {!hasStarted && (
         <p className="text-center text-sm animate-pulse-slow" style={{ color: 'var(--text-subtle)' }}>
-          Empieza a escribir — no podrás borrar. Deja que fluya.
+          Podés corregir errores — Agamenón igual registra lo que borraste.
         </p>
       )}
 
@@ -205,7 +254,7 @@ export function WritingEditor({ prompt, onComplete }: WritingEditorProps) {
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
-          placeholder="Escribe aquí..."
+          placeholder="Escribí aquí..."
           disabled={isSubmitting}
           autoFocus
           className="w-full h-full min-h-[320px] p-5 rounded-lg resize-none outline-none text-base leading-relaxed transition-all duration-200"
@@ -221,17 +270,16 @@ export function WritingEditor({ prompt, onComplete }: WritingEditorProps) {
           }}
         />
 
-        {/* Overlay de "sigue escribiendo" */}
         {blurPx >= 4 && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <p className="text-sm animate-pulse-slow" style={{ color: 'var(--text-muted)' }}>
-              Sigue escribiendo...
+              Seguí escribiendo...
             </p>
           </div>
         )}
       </div>
 
-      {/* Footer: timer + palabras + botón */}
+      {/* Footer */}
       <div className="flex items-center justify-between">
         <div className="flex gap-4 text-sm" style={{ color: 'var(--text-subtle)' }}>
           {hasStarted && <span>{formatTime(elapsed)}</span>}

@@ -8,7 +8,7 @@ import { SessionResults } from '@/components/session/SessionResults';
 import { createClient } from '@/lib/supabase/client';
 import { getRandomPrompt, getDepthFromSessionCount, DEPTH_LABELS } from '@/lib/prompts';
 import type { Prompt, PromptDepth } from '@/lib/prompts';
-import type { LatencyEntry, Insights } from '@/lib/types';
+import type { LatencyEntry, Insights, DeletionEntry } from '@/lib/types';
 
 type Step = 'loading' | 'pre_session' | 'mood_before' | 'writing' | 'analyzing' | 'results';
 type FollowUp = 'si' | 'parcialmente' | 'no';
@@ -156,7 +156,7 @@ export default function NewSessionPage() {
   };
 
   const handleWritingComplete = useCallback(
-    async (text: string, latencyData: LatencyEntry[]) => {
+    async (text: string, latencyData: LatencyEntry[], deletions: DeletionEntry[]) => {
       setStep('analyzing');
       const duration = Math.round((Date.now() - startTime) / 1000);
 
@@ -204,6 +204,7 @@ export default function NewSessionPage() {
           body: JSON.stringify({
           text,
           latency_data: latencyData,
+          deletions,
           user_vocabulary: vocabulary,
           active_goal: activeGoal,
         }),

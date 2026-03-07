@@ -28,6 +28,11 @@ export interface LatencyEntry {
   is_hesitation: boolean;
 }
 
+export interface DeletionEntry {
+  deleted_text: string;
+  pause_before_ms: number;
+}
+
 export interface Insights {
   id?: string;
   session_id?: string;

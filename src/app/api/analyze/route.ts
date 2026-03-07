@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@/lib/supabase/server';
-import type { LatencyEntry } from '@/lib/types';
+import type { LatencyEntry, DeletionEntry } from '@/lib/types';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
 
   let text: string;
   let latency_data: LatencyEntry[];
+  let deletions: DeletionEntry[] = [];
   let user_vocabulary: string[] = [];
   let active_goal: string | null = null;
 
@@ -61,6 +62,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     text = body.text;
     latency_data = body.latency_data ?? [];
+    deletions = body.deletions ?? [];
     user_vocabulary = body.user_vocabulary ?? [];
     active_goal = body.active_goal ?? null;
   } catch {
@@ -77,6 +79,13 @@ export async function POST(request: NextRequest) {
     .map((d) => `"${d.word}" (${(d.latency_ms / 1000).toFixed(1)}s)`)
     .join(', ');
 
+  const deletionsSection =
+    deletions.length > 0
+      ? `\n\nFRASES ELIMINADAS DURANTE LA ESCRITURA (borradas tras una pausa significativa — probable autocensura):\n${deletions
+          .map((d) => `- "${d.deleted_text}" (pausa previa: ${(d.pause_before_ms / 1000).toFixed(1)}s)`)
+          .join('\n')}\nSi alguna de estas frases conecta con lo que quedó escrito, señalalo — Tito llegó hasta ahí y retrocedió.`
+      : '';
+
   const vocabularySection =
     user_vocabulary.length > 0
       ? `\n\nVOCABULARIO RECURRENTE DE ESTE USUARIO (palabras que han aparecido en sesiones anteriores): ${user_vocabulary.join(', ')}.\nSi alguna de estas palabras reaparece hoy, señálalo en las preguntas espejo — su reaparición es significativa.`
@@ -87,7 +96,7 @@ export async function POST(request: NextRequest) {
       ? `\n\nOBJETIVO ACTIVO DEL USUARIO (descripción sensorial que el usuario escribió sobre su meta): "${active_goal}".\nSi algo en el texto de hoy conecta con esta sensación o la contradice, podés mencionarlo sutilmente en UNA de las preguntas espejo — sin forzarlo ni nombrarlo directamente.`
       : '';
 
-  const systemPrompt = BASE_SYSTEM_PROMPT + vocabularySection + goalSection;
+  const systemPrompt = BASE_SYSTEM_PROMPT + deletionsSection + vocabularySection + goalSection;
 
   const userMessage = `TEXTO DEL USUARIO:\n${text}\n\nPALABRAS CON HESITACIÓN (el subconsciente dudó aquí):\n${hesitations || 'Ninguna detectada'}`;
 
