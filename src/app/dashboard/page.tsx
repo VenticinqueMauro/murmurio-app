@@ -6,7 +6,16 @@ import { createClient } from '@/lib/supabase/server';
 import { LogoutButton } from '@/components/ui/LogoutButton';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { PuenteDeLosDias } from '@/components/session/PuenteDeLosDias';
+import { CartaSemanal } from '@/components/session/CartaSemanal';
 import type { Session, Insights } from '@/lib/types';
+
+function getWeekStart(): string {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  return d.toISOString().split('T')[0];
+}
 
 interface SessionWithInsight extends Session {
   insights: Insights | Insights[] | null;
@@ -25,8 +34,16 @@ export default async function DashboardPage() {
 
   if (!user) redirect('/login');
 
+  const weekStart = getWeekStart();
+
   // Datos en paralelo
-  const [{ data: sessions }, { data: profile }, { count: totalSessions }] = await Promise.all([
+  const [
+    { data: sessions },
+    { data: profile },
+    { count: totalSessions },
+    { data: weeklyLetter },
+    { count: sessionCountThisWeek },
+  ] = await Promise.all([
     supabase
       .from('sessions')
       .select('*, insights(*)')
@@ -42,6 +59,17 @@ export default async function DashboardPage() {
       .from('sessions')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id),
+    supabase
+      .from('weekly_letters')
+      .select('content, top_words, mood_delta, session_count')
+      .eq('user_id', user.id)
+      .eq('week_start', weekStart)
+      .maybeSingle(),
+    supabase
+      .from('sessions')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .gte('created_at', weekStart),
   ]);
 
   const typedSessions = (sessions ?? []) as SessionWithInsight[];
@@ -91,6 +119,21 @@ export default async function DashboardPage() {
           streakCount={streakCount}
           totalSessions={totalSessions ?? 0}
           hasSessionToday={hasSessionToday}
+        />
+
+        {/* Carta Semanal de Agamenón */}
+        <CartaSemanal
+          initialLetter={
+            weeklyLetter
+              ? {
+                  content: weeklyLetter.content as string,
+                  top_words: weeklyLetter.top_words as string[],
+                  mood_delta: weeklyLetter.mood_delta as number | null,
+                  session_count: weeklyLetter.session_count as number,
+                }
+              : null
+          }
+          sessionCountThisWeek={sessionCountThisWeek ?? 0}
         />
 
         {/* Métricas */}
