@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
   // Construir contexto de hesitaciones
   const hesitations = latency_data
     .filter((d) => d.is_hesitation)
-    .map((d) => `"${d.word}" (${d.latency_ms}ms)`)
+    .map((d) => `"${d.word}" (${(d.latency_ms / 1000).toFixed(1)}s)`)
     .join(', ');
 
   const vocabularySection =

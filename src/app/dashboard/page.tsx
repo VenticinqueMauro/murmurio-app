@@ -193,8 +193,8 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        {/* Módulos de Transformación (semana 3+) */}
-        {(totalSessions ?? 0) >= 14 && (
+        {/* Módulos de Transformación */}
+        {(totalSessions ?? 0) >= 1 && (
           <div className="space-y-3">
             <p
               className="text-xs font-medium tracking-widest uppercase"
