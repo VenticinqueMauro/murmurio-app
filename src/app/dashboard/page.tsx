@@ -193,6 +193,33 @@ export default async function DashboardPage() {
           </div>
         )}
 
+        {/* Módulos de Transformación (semana 3+) */}
+        {(totalSessions ?? 0) >= 14 && (
+          <div className="space-y-3">
+            <p
+              className="text-xs font-medium tracking-widest uppercase"
+              style={{ color: 'var(--text-subtle)' }}
+            >
+              Módulos de Transformación
+            </p>
+            <Link
+              href="/session/rewrite"
+              className="flex items-start gap-4 p-4 rounded-lg transition-all"
+              style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+            >
+              <div className="space-y-1">
+                <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                  Reescritura de Recuerdos
+                </p>
+                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  Tres versiones del mismo evento. Lo que eras, lo que alguien te ve, lo que querés ser.
+                </p>
+              </div>
+              <span className="text-lg shrink-0" style={{ color: 'var(--amber)' }}>→</span>
+            </Link>
+          </div>
+        )}
+
         {/* Lista de sesiones */}
         {typedSessions.length === 0 ? (
           <div className="text-center py-20 space-y-4">
