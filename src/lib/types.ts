@@ -15,6 +15,7 @@ export interface Session {
   duration_seconds: number | null;
   mood_before: number | null;
   mood_after: number | null;
+  micro_action_followup: 'si' | 'parcialmente' | 'no' | null;
   created_at: string;
 }
 

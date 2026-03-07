@@ -5,10 +5,16 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { LogoutButton } from '@/components/ui/LogoutButton';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { PuenteDeLosDias } from '@/components/session/PuenteDeLosDias';
 import type { Session, Insights } from '@/lib/types';
 
 interface SessionWithInsight extends Session {
-  insights: Insights | null;
+  insights: Insights | Insights[] | null;
+}
+
+function getInsights(raw: Insights | Insights[] | null): Insights | null {
+  if (!raw) return null;
+  return Array.isArray(raw) ? (raw[0] ?? null) : raw;
 }
 
 export default async function DashboardPage() {
@@ -19,13 +25,24 @@ export default async function DashboardPage() {
 
   if (!user) redirect('/login');
 
-  // Obtener sesiones con insights
-  const { data: sessions } = await supabase
-    .from('sessions')
-    .select('*, insights(*)')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(20);
+  // Datos en paralelo
+  const [{ data: sessions }, { data: profile }, { count: totalSessions }] = await Promise.all([
+    supabase
+      .from('sessions')
+      .select('*, insights(*)')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(20),
+    supabase
+      .from('profiles')
+      .select('streak_count, last_session_date')
+      .eq('id', user.id)
+      .single(),
+    supabase
+      .from('sessions')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id),
+  ]);
 
   const typedSessions = (sessions ?? []) as SessionWithInsight[];
 
@@ -37,18 +54,23 @@ export default async function DashboardPage() {
         (typedSessions.filter((s) => s.mood_before !== null && s.mood_after !== null).length || 1)
       : 0;
 
+  const streakCount = profile?.streak_count ?? 0;
+  const today = new Date().toISOString().split('T')[0];
+  const hasSessionToday = profile?.last_session_date === today;
+
   return (
     <div
       className="min-h-screen"
       style={{ background: 'var(--bg)', color: 'var(--text)' }}
     >
-      <div className="max-w-2xl mx-auto px-4 py-12 space-y-10">
+      <div className="max-w-2xl mx-auto px-4 py-12 space-y-8">
+
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-light">Murmurio</h1>
             <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-              {typedSessions.length} sesiones registradas
+              {totalSessions ?? 0} sesiones registradas
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -64,6 +86,13 @@ export default async function DashboardPage() {
           </div>
         </div>
 
+        {/* El Puente de 21 días */}
+        <PuenteDeLosDias
+          streakCount={streakCount}
+          totalSessions={totalSessions ?? 0}
+          hasSessionToday={hasSessionToday}
+        />
+
         {/* Métricas */}
         {typedSessions.length > 0 && (
           <div
@@ -71,22 +100,29 @@ export default async function DashboardPage() {
             style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
           >
             <div>
-              <p className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--text-subtle)' }}>
+              <p
+                className="text-xs uppercase tracking-wider mb-1"
+                style={{ color: 'var(--text-subtle)' }}
+              >
                 Delta promedio
               </p>
               <p
                 className="text-2xl font-light"
                 style={{ color: avgDelta >= 0 ? 'var(--amber)' : '#c15a28' }}
               >
-                {avgDelta >= 0 ? '+' : ''}{avgDelta.toFixed(1)} pts
+                {avgDelta >= 0 ? '+' : ''}
+                {avgDelta.toFixed(1)} pts
               </p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--text-subtle)' }}>
-                Total sesiones
+              <p
+                className="text-xs uppercase tracking-wider mb-1"
+                style={{ color: 'var(--text-subtle)' }}
+              >
+                Racha actual
               </p>
               <p className="text-2xl font-light" style={{ color: 'var(--text)' }}>
-                {typedSessions.length}
+                {streakCount} {streakCount === 1 ? 'día' : 'días'}
               </p>
             </div>
           </div>
@@ -95,7 +131,7 @@ export default async function DashboardPage() {
         {/* Lista de sesiones */}
         {typedSessions.length === 0 ? (
           <div className="text-center py-20 space-y-4">
-            <p style={{ color: 'var(--text-muted)' }}>Aún no tienes sesiones.</p>
+            <p style={{ color: 'var(--text-muted)' }}>Aún no tenés sesiones.</p>
             <Link
               href="/session/new"
               className="inline-block px-6 py-3 rounded-lg text-sm font-medium"
@@ -107,6 +143,7 @@ export default async function DashboardPage() {
         ) : (
           <div className="space-y-3">
             {typedSessions.map((session) => {
+              const ins = getInsights(session.insights);
               const delta =
                 session.mood_before !== null && session.mood_after !== null
                   ? session.mood_after - session.mood_before
@@ -124,7 +161,10 @@ export default async function DashboardPage() {
                   className="session-card block p-4 rounded-lg space-y-2 transition-all"
                 >
                   <div className="flex items-start justify-between gap-4">
-                    <p className="text-sm leading-relaxed line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+                    <p
+                      className="text-sm leading-relaxed line-clamp-2"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
                       {session.prompt}
                     </p>
                     {delta !== null && (
@@ -132,14 +172,15 @@ export default async function DashboardPage() {
                         className="text-sm font-medium shrink-0"
                         style={{ color: delta >= 0 ? 'var(--amber)' : '#c15a28' }}
                       >
-                        {delta >= 0 ? '+' : ''}{delta} pts
+                        {delta >= 0 ? '+' : ''}
+                        {delta} pts
                       </span>
                     )}
                   </div>
 
-                  {session.insights?.top_words && session.insights.top_words.length > 0 && (
+                  {ins?.top_words && ins.top_words.length > 0 && (
                     <div className="flex flex-wrap gap-1">
-                      {session.insights.top_words.slice(0, 5).map((w, i) => (
+                      {ins.top_words.slice(0, 5).map((w, i) => (
                         <span
                           key={i}
                           className="text-xs px-2 py-0.5 rounded-full"
