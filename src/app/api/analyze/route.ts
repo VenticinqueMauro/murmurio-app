@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@/lib/supabase/server';
 import type { LatencyEntry, DeletionEntry } from '@/lib/types';
+import { PROGRAMS, type ProgramId } from '@/lib/programs';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -57,6 +58,7 @@ export async function POST(request: NextRequest) {
   let deletions: DeletionEntry[] = [];
   let user_vocabulary: string[] = [];
   let active_goal: string | null = null;
+  let program: string | null = null;
 
   try {
     const body = await request.json();
@@ -65,6 +67,7 @@ export async function POST(request: NextRequest) {
     deletions = body.deletions ?? [];
     user_vocabulary = body.user_vocabulary ?? [];
     active_goal = body.active_goal ?? null;
+    program = body.program ?? null;
   } catch {
     return NextResponse.json({ error: 'Cuerpo de solicitud inválido' }, { status: 400 });
   }
@@ -96,7 +99,12 @@ export async function POST(request: NextRequest) {
       ? `\n\nOBJETIVO ACTIVO DEL USUARIO (descripción sensorial que el usuario escribió sobre su meta): "${active_goal}".\nSi algo en el texto de hoy conecta con esta sensación o la contradice, podés mencionarlo sutilmente en UNA de las preguntas espejo — sin forzarlo ni nombrarlo directamente.`
       : '';
 
-  const systemPrompt = BASE_SYSTEM_PROMPT + deletionsSection + vocabularySection + goalSection;
+  const programConfig = program ? PROGRAMS[program as ProgramId] : null;
+  const programSection = programConfig?.claudeContext
+    ? `\n\n${programConfig.claudeContext}`
+    : '';
+
+  const systemPrompt = BASE_SYSTEM_PROMPT + deletionsSection + vocabularySection + goalSection + programSection;
 
   const userMessage = `TEXTO DEL USUARIO:\n${text}\n\nPALABRAS CON HESITACIÓN (el subconsciente dudó aquí):\n${hesitations || 'Ninguna detectada'}`;
 

@@ -9,6 +9,8 @@ import { PuenteDeLosDias } from '@/components/session/PuenteDeLosDias';
 import { CartaSemanal } from '@/components/session/CartaSemanal';
 import { VocabularioPersonal } from '@/components/session/VocabularioPersonal';
 import type { Session, Insights } from '@/lib/types';
+import { PROGRAMS, DEFAULT_PROGRAM, type ProgramId } from '@/lib/programs';
+import ChangeProgramPanel from '@/components/ui/ChangeProgramPanel';
 
 function getWeekStart(): string {
   const d = new Date();
@@ -54,7 +56,7 @@ export default async function DashboardPage() {
       .limit(20),
     supabase
       .from('profiles')
-      .select('streak_count, last_session_date')
+      .select('streak_count, last_session_date, program')
       .eq('id', user.id)
       .single(),
     supabase
@@ -105,6 +107,9 @@ export default async function DashboardPage() {
   const today = new Date().toISOString().split('T')[0];
   const hasSessionToday = profile?.last_session_date === today;
 
+  const programId = (profile?.program ?? DEFAULT_PROGRAM) as ProgramId;
+  const programConfig = PROGRAMS[programId] ?? PROGRAMS[DEFAULT_PROGRAM];
+
   return (
     <div
       className="min-h-screen"
@@ -133,22 +138,21 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Nav secundaria */}
-        <nav className="flex gap-1 flex-wrap">
-          {[
-            { href: '/session/rewrite', label: 'Reescritura' },
-            { href: '/session/goals', label: 'Metas' },
-            { href: '/session/aversion', label: 'Aversión' },
-          ].map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              className="nav-pill px-3 py-1.5 rounded-lg text-xs font-medium"
-            >
-              {label}
-            </Link>
-          ))}
-        </nav>
+        {/* Nav secundaria — módulos del programa */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <nav className="flex gap-1 flex-wrap">
+            {programConfig.featuredModules.map(({ href, label, isPrimary }) => (
+              <Link
+                key={href}
+                href={href}
+                className={`${isPrimary ? 'nav-pill-primary' : 'nav-pill'} px-3 py-1.5 rounded-lg text-xs font-medium`}
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
+          <ChangeProgramPanel currentProgram={programId} />
+        </div>
 
         {/* El Puente de 21 días */}
         <PuenteDeLosDias
@@ -213,15 +217,17 @@ export default async function DashboardPage() {
 
         {/* Lista de sesiones */}
         {typedSessions.length === 0 ? (
-          <div className="text-center py-20 space-y-4">
-            <p style={{ color: 'var(--text-muted)' }}>Aún no tenés sesiones.</p>
-            <Link
-              href="/session/new"
-              className="inline-block px-6 py-3 rounded-lg text-sm font-medium"
-              style={{ background: 'var(--amber)', color: 'var(--btn-primary-text)' }}
-            >
-              Comenzar primera sesión
-            </Link>
+          <div className="space-y-6 py-8">
+            <ChangeProgramPanel currentProgram={programId} isFirstTime />
+            <div className="text-center">
+              <Link
+                href="/session/new"
+                className="inline-block px-6 py-3 rounded-lg text-sm font-medium"
+                style={{ background: 'var(--amber)', color: 'var(--btn-primary-text)' }}
+              >
+                Comenzar primera sesión
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">

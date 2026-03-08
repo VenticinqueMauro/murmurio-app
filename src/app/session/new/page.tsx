@@ -6,9 +6,10 @@ import { WritingEditor } from '@/components/editor/WritingEditor';
 import { MoodSlider } from '@/components/session/MoodSlider';
 import { SessionResults } from '@/components/session/SessionResults';
 import { createClient } from '@/lib/supabase/client';
-import { getRandomPrompt, getDepthFromSessionCount, DEPTH_LABELS } from '@/lib/prompts';
-import type { Prompt, PromptDepth } from '@/lib/prompts';
+import { getRandomPrompt, getDepthFromSessionCount, DEPTH_LABELS, CATEGORY_LABELS } from '@/lib/prompts';
+import type { Prompt, PromptDepth, PromptCategory } from '@/lib/prompts';
 import type { LatencyEntry, Insights, DeletionEntry } from '@/lib/types';
+import { PROGRAMS, DEFAULT_PROGRAM, type ProgramId } from '@/lib/programs';
 
 type Step = 'loading' | 'pre_session' | 'mood_before' | 'writing' | 'analyzing' | 'results';
 type FollowUp = 'si' | 'parcialmente' | 'no';
@@ -22,13 +23,6 @@ interface LastSession {
   } | null;
 }
 
-const CATEGORIES: { value: Prompt['category']; label: string }[] = [
-  { value: 'general', label: 'General' },
-  { value: 'ansiedad', label: 'Ansiedad' },
-  { value: 'relaciones', label: 'Relaciones' },
-  { value: 'trabajo', label: 'Trabajo' },
-];
-
 export default function NewSessionPage() {
   const router = useRouter();
 
@@ -39,7 +33,8 @@ export default function NewSessionPage() {
   const [sessionCount, setSessionCount] = useState(0);
   const [vocabulary, setVocabulary] = useState<string[]>([]);
   const [activeGoal, setActiveGoal] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<Prompt['category']>('general');
+  const [userProgram, setUserProgram] = useState<ProgramId>(DEFAULT_PROGRAM);
+  const [selectedCategory, setSelectedCategory] = useState<PromptCategory>('general');
   const [prompt, setPrompt] = useState<Prompt>(() => getRandomPrompt('general', 'superficie'));
   const [moodBefore, setMoodBefore] = useState(5);
   const [moodAfter, setMoodAfter] = useState(5);
@@ -56,7 +51,7 @@ export default function NewSessionPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
 
-      const [{ data }, { count }, { data: insightsData }, { data: goalData }] = await Promise.all([
+      const [{ data }, { count }, { data: insightsData }, { data: goalData }, { data: profileData }] = await Promise.all([
         supabase
           .from('sessions')
           .select('id, micro_action_followup, insights(micro_action, top_words)')
@@ -80,11 +75,21 @@ export default function NewSessionPage() {
           .eq('active', true)
           .limit(1)
           .maybeSingle(),
+        supabase
+          .from('profiles')
+          .select('program')
+          .eq('id', user.id)
+          .maybeSingle(),
       ]);
+
+      const programId = (profileData?.program ?? DEFAULT_PROGRAM) as ProgramId;
+      const programConfig = PROGRAMS[programId] ?? PROGRAMS[DEFAULT_PROGRAM];
+      setUserProgram(programId);
+      setSelectedCategory(programConfig.defaultCategory);
 
       const total = count ?? 0;
       setSessionCount(total);
-      setPrompt(getRandomPrompt('general', getDepthFromSessionCount(total)));
+      setPrompt(getRandomPrompt(programConfig.defaultCategory, getDepthFromSessionCount(total)));
 
       // Construir vocabulario histórico (top 10 palabras más frecuentes)
       const wordFreq: Record<string, number> = {};
@@ -174,6 +179,7 @@ export default function NewSessionPage() {
             raw_text: text,
             duration_seconds: duration,
             mood_before: moodBefore,
+            program: userProgram,
           })
           .select()
           .single();
@@ -202,12 +208,13 @@ export default function NewSessionPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-          text,
-          latency_data: latencyData,
-          deletions,
-          user_vocabulary: vocabulary,
-          active_goal: activeGoal,
-        }),
+            text,
+            latency_data: latencyData,
+            deletions,
+            user_vocabulary: vocabulary,
+            active_goal: activeGoal,
+            program: userProgram,
+          }),
         });
 
         if (!response.ok) throw new Error('El análisis falló');
@@ -234,7 +241,7 @@ export default function NewSessionPage() {
         setStep('writing');
       }
     },
-    [startTime, moodBefore, prompt, router, vocabulary, activeGoal]
+    [startTime, moodBefore, prompt, router, vocabulary, activeGoal, userProgram]
   );
 
   const handleSaveSession = async () => {
@@ -395,25 +402,25 @@ export default function NewSessionPage() {
                 ¿Sobre qué querés escribir?
               </p>
               <div className="flex gap-2 flex-wrap">
-                {CATEGORIES.map((cat) => (
+                {(PROGRAMS[userProgram]?.categories ?? PROGRAMS[DEFAULT_PROGRAM].categories).map((cat) => (
                   <button
-                    key={cat.value}
-                    onClick={() => handleCategoryChange(cat.value)}
+                    key={cat}
+                    onClick={() => handleCategoryChange(cat)}
                     className="px-4 py-1.5 rounded-full text-sm transition-all"
                     style={{
                       background:
-                        selectedCategory === cat.value ? 'var(--amber)' : 'var(--surface)',
+                        selectedCategory === cat ? 'var(--amber)' : 'var(--surface)',
                       color:
-                        selectedCategory === cat.value
+                        selectedCategory === cat
                           ? 'var(--btn-primary-text)'
                           : 'var(--text-muted)',
                       border: `1px solid ${
-                        selectedCategory === cat.value ? 'var(--amber)' : 'var(--border)'
+                        selectedCategory === cat ? 'var(--amber)' : 'var(--border)'
                       }`,
                       cursor: 'pointer',
                     }}
                   >
-                    {cat.label}
+                    {CATEGORY_LABELS[cat]}
                   </button>
                 ))}
               </div>

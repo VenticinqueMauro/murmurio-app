@@ -51,12 +51,25 @@ Next.js 16.1 App Router con Supabase como BaaS y Claude como motor de análisis.
 - `deletions: DeletionEntry[]` — autocensuras detectadas
 - `user_vocabulary: string[]` — top-10 palabras históricas del usuario
 - `active_goal: string | null` — descripción sensorial del goal activo (inyección silenciosa)
+- `program: string | null` — programa activo del usuario (inyecta `claudeContext` al system prompt)
+
+### Programas especializados
+`src/lib/programs.ts` — 6 programas que adaptan la experiencia por perfil de usuario:
+- `bienestar` (default), `habitos`, `insomnio`, `duelo`, `cuerpo`, `proposito`
+- Cada programa define: `categories[]`, `defaultCategory`, `featuredModules[]`, `claudeContext`, `weeklyLetterContext`
+- El programa se guarda en `profiles.program` (TEXT, default `'bienestar'`)
+- `ChangeProgramPanel.tsx` permite cambiar desde el dashboard (Client Component)
+- Ver `docs/PROGRAMAS.md` para el plan completo
 
 ### Prompts
-`src/lib/prompts.ts` — 28 prompts × 4 categorías × 3 profundidades:
+`src/lib/prompts.ts` — ~53 prompts × 9 categorías × 3 profundidades:
+- **Categorías originales**: `general`, `ansiedad`, `relaciones`, `trabajo`
+- **Categorías nuevas**: `habitos`, `insomnio`, `perdida`, `cuerpo`, `identidad`
 - `superficie` (sesiones 0-6): preguntas de contacto con el presente
 - `patron` (sesiones 7-13): identificación de repeticiones
 - `transformacion` (sesiones 14+): preguntas desde la versión futura
+- `PromptCategory` — type union exportado con las 9 categorías
+- `CATEGORY_LABELS` — map de category → label display
 
 `getDepthFromSessionCount(n)` calcula el nivel. `getRandomPrompt(category, depth)` filtra con fallback al pool completo si no hay prompts en ese nivel para esa categoría.
 
@@ -68,8 +81,8 @@ Next.js 16.1 App Router con Supabase como BaaS y Claude como motor de análisis.
 Tablas (todas con RLS):
 | Tabla | Descripción |
 |---|---|
-| `profiles` | streak_count, last_session_date |
-| `sessions` | incluye micro_action_followup |
+| `profiles` | streak_count, last_session_date, **program** (TEXT default 'bienestar') |
+| `sessions` | incluye micro_action_followup, **program** (TEXT) |
 | `insights` | top_words, contradictions, micro_action, reflection_questions |
 | `latency_data` | por palabra: latency_ms, is_hesitation |
 | `weekly_letters` | UNIQUE(user_id, week_start) — idempotente |
@@ -78,14 +91,14 @@ Tablas (todas con RLS):
 
 Función RPC: `update_streak(p_user_id UUID)` — llamada tras cada sesión completada.
 
-Migraciones en orden: `schema.sql` → `001` → `002` → `003` → `004`
+Migraciones en orden: `schema.sql` → `001` → `002` → `003` → `004` → `005`
 
 ### Theming
 CSS custom properties en `src/app/globals.css`. Dark mode es el default (`:root`), light mode con `[data-theme="light"]`. El toggle persiste en `localStorage` y se aplica con un script inline en `layout.tsx` antes de hidratación para evitar flash.
 
 **No usar clases Tailwind para colores — usar `var(--*)` inline o clases CSS definidas en globals.css.**
 
-Clases CSS utilitarias en globals.css: `.nav-pill`, `.session-card`, `.back-link`, `.animate-fade-in`, `.animate-pulse-slow`
+Clases CSS utilitarias en globals.css: `.nav-pill`, `.nav-pill-primary`, `.session-card`, `.back-link`, `.animate-fade-in`, `.animate-pulse-slow`, `.program-card`
 
 Variable clave: `--btn-primary-text` cambia entre modos para botones con fondo ámbar (`#0a0907` en dark, `#faf7f2` en light).
 
@@ -116,7 +129,12 @@ Componentes animados de lucide-animated en `src/components/icons/`. Requieren `m
 | `src/components/session/PuenteDeLosDias.tsx` | Visualización racha 21 días |
 | `src/components/session/CartaSemanal.tsx` | Client Component carta semanal |
 | `src/components/session/VocabularioPersonal.tsx` | Nube de palabras históricas |
-| `src/lib/prompts.ts` | 28 prompts × categoría × depth |
-| `src/lib/types.ts` | Session, Insights, LatencyEntry, DeletionEntry |
+| `src/lib/prompts.ts` | ~53 prompts × 9 categorías × depth + CATEGORY_LABELS |
+| `src/lib/programs.ts` | 6 programas: ProgramId, PROGRAMS, PROGRAM_LIST |
+| `src/lib/types.ts` | Session, Insights, LatencyEntry, DeletionEntry, Profile |
+| `src/components/ui/ProgramSelector.tsx` | Grid de tarjetas para elegir programa |
+| `src/components/ui/ChangeProgramPanel.tsx` | Client Component para cambiar programa desde dashboard |
 | `supabase/schema.sql` | Schema base PostgreSQL con RLS |
+| `supabase/migrations/005_programs.sql` | Agrega program a profiles y sessions |
 | `docs/PRODUCTO.md` | Plan de producto — fases, métricas, roadmap |
+| `docs/PROGRAMAS.md` | Plan de implementación de programas especializados |

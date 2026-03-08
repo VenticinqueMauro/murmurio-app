@@ -114,6 +114,35 @@ input[type='range']::-webkit-slider-thumb:hover {
   border-color: var(--border-hover);
 }
 
+/* Nav pill primaria (módulo destacado del programa) */
+.nav-pill-primary {
+  background: var(--surface);
+  color: var(--amber);
+  border: 1px solid var(--amber-dim);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.nav-pill-primary:hover {
+  background: var(--surface-2);
+  color: var(--amber-light);
+  border-color: var(--amber);
+}
+
+/* Program selector card */
+.program-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: border-color 0.15s, background 0.15s;
+  cursor: pointer;
+}
+.program-card:hover {
+  border-color: var(--border-hover);
+  background: var(--surface-2);
+}
+.program-card.selected {
+  border-color: var(--amber);
+  background: var(--surface-2);
+}
+
 /* Animaciones */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@/lib/supabase/server';
+import { PROGRAMS, type ProgramId } from '@/lib/programs';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -24,6 +25,20 @@ export async function GET() {
   }
 
   const weekStart = getWeekStart();
+
+  // Leer programa del usuario
+  const { data: profileData } = await supabase
+    .from('profiles')
+    .select('program')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const programConfig = profileData?.program
+    ? PROGRAMS[profileData.program as ProgramId]
+    : null;
+  const programContext = programConfig?.weeklyLetterContext
+    ? `\n\n${programConfig.weeklyLetterContext}`
+    : '';
 
   // Si ya existe la carta de esta semana, devolverla directamente
   const { data: existing } = await supabase
@@ -100,7 +115,7 @@ La carta debe:
 
 Tono: como alguien que te conoce mejor que vos mismo y te habla con honestidad y afecto.
 Extensión: no más de 180 palabras.
-No uses encabezado ni firma — la carta comienza directamente.`;
+No uses encabezado ni firma — la carta comienza directamente.${programContext}`;
 
   try {
     const response = await anthropic.messages.create({

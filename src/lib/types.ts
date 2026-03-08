@@ -5,6 +5,7 @@ export interface Profile {
   streak_count: number;
   last_session_date: string | null;
   created_at: string;
+  program?: string;
 }
 
 export interface Session {
