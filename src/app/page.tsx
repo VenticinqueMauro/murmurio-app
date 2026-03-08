@@ -102,8 +102,8 @@ export default async function Home() {
         {[
           {
             n: '01',
-            title: 'Escribís sin poder borrar',
-            desc: 'Un editor que no permite retroceder ni editar. Si dejás de escribir por 3 segundos, la pantalla se difumina. Esto obliga a Tito a soltar el control.',
+            title: 'Escribís y Agamenón registra todo — incluso lo que borrás',
+            desc: 'Un editor que difumina el texto si parás más de 3 segundos, para mantener el flujo. Podés borrar, pero Agamenón registra las pausas y las frases eliminadas: lo que censuraste también habla.',
           },
           {
             n: '02',

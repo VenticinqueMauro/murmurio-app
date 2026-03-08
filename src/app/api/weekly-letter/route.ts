@@ -115,7 +115,8 @@ La carta debe:
 
 Tono: como alguien que te conoce mejor que vos mismo y te habla con honestidad y afecto.
 Extensión: no más de 180 palabras.
-No uses encabezado ni firma — la carta comienza directamente.${programContext}`;
+No uses encabezado ni firma — la carta comienza directamente.
+No uses markdown, asteriscos, guiones ni ningún símbolo de formato. Solo texto limpio.${programContext}`;
 
   try {
     const response = await anthropic.messages.create({

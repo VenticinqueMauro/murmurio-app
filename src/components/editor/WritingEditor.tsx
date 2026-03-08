@@ -280,7 +280,7 @@ export function WritingEditor({ prompt, onComplete }: WritingEditorProps) {
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between" style={{ position: 'relative', zIndex: 10 }}>
         <div className="flex gap-4 text-sm" style={{ color: 'var(--text-subtle)' }}>
           {hasStarted && <span>{formatTime(elapsed)}</span>}
           <span>
@@ -296,6 +296,8 @@ export function WritingEditor({ prompt, onComplete }: WritingEditorProps) {
             background: canSubmit ? 'var(--amber)' : 'var(--surface-2)',
             color: canSubmit ? 'var(--btn-primary-text)' : 'var(--text-subtle)',
             cursor: canSubmit ? 'pointer' : 'not-allowed',
+            position: 'relative',
+            zIndex: 10,
           }}
         >
           {isSubmitting ? 'Analizando...' : 'Ver la Respuesta del Gigante'}

@@ -122,7 +122,7 @@ export default async function DashboardPage() {
           <div>
             <h1 className="text-2xl font-light">Murmurio</h1>
             <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-              {totalSessions ?? 0} sesiones registradas
+              {totalSessions ?? 0} {totalSessions === 1 ? 'sesión' : 'sesiones'} registradas
             </p>
           </div>
           <div className="flex items-center gap-2">
